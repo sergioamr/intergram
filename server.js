@@ -20,6 +20,7 @@ global.last_update_id = -1;
 global.last_user_id = false;
 global.number_users = 0;
 global.number_messages = 0;
+global.private_chat = false;
 
 function send_status(chatId) {
     sendTelegramMessage(chatId,
@@ -75,14 +76,22 @@ function fetch_updates() {
                             if (text.startsWith("/status")) {
                                 send_status(chatId);
                             }
-                        }
 
+                            // A command will always disable the automatic chat
+                            // so we don't send random stuff to the website user
+                            if (global.last_user_id != false || global.private_chat) {
+                                sendTelegramMessage(chatId, " ==== PRIVATE CHAT ==== ");
+                                global.last_user_id = false;
+                                global.private_chat = true;
+                            }
+                        } else
                         if (reply) {
                             let replyText = reply.text || "";
                             let userId = replyText.split(':')[0];
 
                             if (userId != global.last_user_id) {
                                 global.last_user_id = userId;
+                                global.private_chat = false;
                                 sendTelegramMessage(chatId, userId + ":: Selected to Chat ");
                             }
 
@@ -93,12 +102,10 @@ function fetch_updates() {
                             });
 
                         } else
-                        if (text) {
+                        if (text && !global.private_chat) {
                             if (global.last_user_id != false) {
                                 //console.log(" SELECTED " + global.last_user_id);
-
                                 userId = global.last_user_id;
-
                                 io.emit(chatId + "-" + userId, {
                                     name,
                                     text,
@@ -180,11 +187,12 @@ io.on('connection', function (client) {
 
         client.on('disconnect', function () {
             if (messageReceived) {
-                if (userId == global.last_user_id)
-                    global.last_user_id = false;
-
-                sendTelegramMessage(chatId, userId + ":: has left");
             }
+
+            if (userId == global.last_user_id)
+                global.last_user_id = false;
+
+            sendTelegramMessage(chatId, userId + ":: has left");
             global.number_users--;
         });
     });
