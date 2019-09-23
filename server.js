@@ -18,10 +18,19 @@ app.use(bodyParser.json());
 
 global.last_update_id = -1;
 global.last_user_id = false;
+global.number_users = 0;
+global.number_messages = 0;
+
+function send_status(chatId) {
+    sendTelegramMessage(chatId,
+        "- Selected user [" + global.last_user_id+ "]\n" +
+        "- Users online " + global.number_users + "\n" +
+        "- Total messages " + global.number_messages + "\n");
+}
 
 function fetch_updates() {
     var url = 'https://api.telegram.org/bot' + process.env.TELEGRAM_TOKEN + '/getUpdates?offset=' + global.last_update_id;
-    console.log(url);
+    //console.log(url);
     https.get(url, function (res) {
         var body = '';
 
@@ -31,7 +40,7 @@ function fetch_updates() {
 
         res.on('end', function () {
             var t_response = JSON.parse(body);
-            console.log("Got a response: ", t_response);
+            //console.log("Got a response: ", t_response);
             var telegram_response = t_response.result;
 
             if (!telegram_response) {
@@ -62,6 +71,9 @@ function fetch_updates() {
                                     "Your unique chat id is `" + chatId + "`\n" +
                                     "Use it to link between the embedded chat and this telegram chat",
                                     "Markdown");
+                            } else
+                            if (text.startsWith("/status")) {
+                                send_status(chatId);
                             }
                         }
 
@@ -71,7 +83,7 @@ function fetch_updates() {
 
                             if (userId != global.last_user_id) {
                                 global.last_user_id = userId;
-                                sendTelegramMessage(chatId, "Selected chat [" + userId + "]");
+                                sendTelegramMessage(chatId, userId + ":: Selected to Chat ");
                             }
 
                             io.emit(chatId + "-" + userId, {
@@ -83,6 +95,8 @@ function fetch_updates() {
                         } else
                         if (text) {
                             if (global.last_user_id != false) {
+                                //console.log(" SELECTED " + global.last_user_id);
+
                                 userId = global.last_user_id;
 
                                 io.emit(chatId + "-" + userId, {
@@ -126,44 +140,7 @@ app.post('/hook1', function (req, res) {
         const text = message.text || "";
         const reply = message.reply_to_message;
 
-        if (text.startsWith("/")) {
-            if (text.startsWith("/start")) {
-                console.log("/start chatId " + chatId);
-                sendTelegramMessage(chatId,
-                    "*Welcome to Intergram* \n" +
-                    "Your unique chat id is `" + chatId + "`\n" +
-                    "Use it to link between the embedded chat and this telegram chat",
-                    "Markdown");
-            }
-        }
-
-        if (reply) {
-            let replyText = reply.text || "";
-            let userId = replyText.split(':')[0];
-
-            global.last_user_id = userId;
-            io.emit(chatId + "-" + userId, {
-                name,
-                text,
-                from: 'admin'
-            });
-
-        } else
-        if (text) {
-            if (global.last_user_id != false) {
-                io.emit(chatId + "-" + userId, {
-                    name,
-                    text,
-                    from: 'admin'
-                });
-            } else {
-                io.emit(chatId, {
-                    name,
-                    text,
-                    from: 'admin'
-                });
-            }
-        }
+        // TODO: Rebuild this, we will use hooks later
 
     } catch (e) {
         console.error("hook error", e, req.body);
@@ -181,13 +158,24 @@ io.on('connection', function (client) {
         let messageReceived = false;
         console.log("useId " + userId + " connected to chatId " + chatId);
 
-        sendTelegramMessage(chatId, userId + " Connected to ChatID");
+        global.number_users++;
+
+        if (!global.last_user_id) {
+            sendTelegramMessage(chatId, userId + ":: Connected and Selected! ");
+            global.last_user_id = userId;
+        } else {
+            sendTelegramMessage(chatId, userId + ":: Connected to ChatID");
+        }
+
+        send_status(chatId);
 
         client.on('message', function (msg) {
             messageReceived = true;
             io.emit(chatId + "-" + userId, msg);
             let visitorName = msg.visitorName ? "[" + msg.visitorName + "]: " : "";
             sendTelegramMessage(chatId, userId + ":" + visitorName + " " + msg.text);
+
+            global.number_messages++;
         });
 
         client.on('disconnect', function () {
@@ -195,14 +183,17 @@ io.on('connection', function (client) {
                 if (userId == global.last_user_id)
                     global.last_user_id = false;
 
-                sendTelegramMessage(chatId, userId + " has left");
+                sendTelegramMessage(chatId, userId + ":: has left");
             }
+            global.number_users--;
         });
     });
 
 });
 
 function sendTelegramMessage(chatId, text, parseMode) {
+
+    console.log(" SEND MESSAGE " + chatId + " " + text);
     request
         .post('https://api.telegram.org/bot' + process.env.TELEGRAM_TOKEN + '/sendMessage')
         .form({
