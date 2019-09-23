@@ -54,27 +54,49 @@ function fetch_updates() {
                         const text = message.text || "";
                         const reply = message.reply_to_message;
 
-                        if (text.startsWith("/start")) {
-                            console.log("/start chatId " + chatId);
-                            sendTelegramMessage(chatId,
-                                "*Welcome to Intergram* \n" +
-                                "Your unique chat id is `" + chatId + "`\n" +
-                                "Use it to link between the embedded chat and this telegram chat",
-                                "Markdown");
-                        } else if (reply) {
+                        if (text.startsWith("/")) {
+                            if (text.startsWith("/start")) {
+                                console.log("/start chatId " + chatId);
+                                sendTelegramMessage(chatId,
+                                    "*Welcome to Intergram* \n" +
+                                    "Your unique chat id is `" + chatId + "`\n" +
+                                    "Use it to link between the embedded chat and this telegram chat",
+                                    "Markdown");
+                            }
+                        }
+
+                        if (reply) {
                             let replyText = reply.text || "";
                             let userId = replyText.split(':')[0];
+
+                            if (userId != global.last_user_id) {
+                                global.last_user_id = userId;
+                                sendTelegramMessage(chatId, "Selected chat [" + userId + "]");
+                            }
+
                             io.emit(chatId + "-" + userId, {
                                 name,
                                 text,
                                 from: 'admin'
                             });
-                        } else if (text) {
-                            io.emit(chatId, {
-                                name,
-                                text,
-                                from: 'admin'
-                            });
+
+                        } else
+                        if (text) {
+                            if (global.last_user_id != false) {
+                                userId = global.last_user_id;
+
+                                io.emit(chatId + "-" + userId, {
+                                    name,
+                                    text,
+                                    from: 'admin'
+                                });
+                            } else {
+                                io.emit(chatId, {
+                                    name,
+                                    text,
+                                    from: 'admin'
+                                });
+                            }
                         }
                     }
                 }
