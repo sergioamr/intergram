@@ -41,8 +41,8 @@ export default class Chat extends Component {
                        ref={(input) => { this.input = input }}
                        onKeyPress={this.handleKeyPress}/>
 
-                <a class="banner" href="https://github.com/idoco/intergram" target="_blank">
-                    Powered by <b>Intergram</b>&nbsp;
+                <a class="banner" href="https://github.com/sergioamr/intergram" target="_blank">
+                    <small>Chat powered by <b>Intergram</b>&nbsp;</small>
                 </a>
             </div>
         );
