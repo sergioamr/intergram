@@ -6,7 +6,7 @@ const bodyParser = require('body-parser');
 const app = express();
 const https = require('https')
 const http = require('http').Server(app);
-const io = require('socket.io')(http);
+const io = require('socket.io')(http, { path: '/chat.io/'});
 
 console.log("Start " + process.env.TELEGRAM_TOKEN);
 
